@@ -99,34 +99,37 @@ td{padding:9px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabu
 tr.me td{background:var(--accent-soft);font-weight:700}
 .note{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.6}
 .pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600;background:var(--accent-soft);color:var(--accent)}
+.lock{text-align:center;padding:26px 10px}
+.lock .ic{font-size:40px}
+.lock h3{font-size:18px;margin:10px 0 6px}
+.lock p{font-size:14.5px;color:var(--muted);line-height:1.7}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chips button{padding:6px 14px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid var(--line);border-radius:99px;background:var(--card);color:var(--muted)}
+.chips button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><h1>CST Python Quiz</h1><span>Pabna Polytechnic Institute · 1st Semester</span></div>
+  <div class="brand"><h1 id="examName">CST Python Quiz</h1><span id="brandSub">Pabna Polytechnic Institute · Dept. of CST</span></div>
 
   <!-- JOIN -->
   <div id="vJoin" class="card">
-    <div class="tabs">
-      <button id="tabQuiz" class="on">কুইজ</button>
-      <button id="tabBoard">লিডারবোর্ড</button>
+    <div id="joinLoading"><p class="note">এক্সামের তথ্য লোড হচ্ছে...</p></div>
+    <div id="joinLocked" class="lock" hidden>
+      <div class="ic">🔒</div>
+      <h3 id="lockTitle">এক্সাম এখন বন্ধ</h3>
+      <p id="lockMsg"></p>
     </div>
-    <div id="joinForm">
-      <h2>Python Programming Quiz</h2>
+    <div id="joinForm" hidden>
       <label for="fName">নাম (Full Name)</label>
       <input id="fName" maxlength="40" autocomplete="off" placeholder="Md Abu Talha">
       <label for="fRoll">বোর্ড রোল</label>
       <input id="fRoll" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="123456">
+      <label for="fSem">সেমিস্টার</label>
+      <select id="fSem"></select>
       <label for="fShift">শিফট</label>
       <select id="fShift"><option>1st Shift</option><option>2nd Shift</option></select>
-      <ul class="rules">
-        <li><b>২৫টা প্রশ্ন</b>, প্রতিটায় <b>৪৫ সেকেন্ড</b> — সব মিলিয়ে ~১৫ মিনিট</li>
-        <li>মার্ক সমান হলে <b>কম সময়</b> যার, র‍্যাংকিংয়ে সে এগিয়ে</li>
-        <li>প্রত্যেক স্টুডেন্টের প্রশ্ন <b>আলাদা</b> — কপি করে লাভ নেই</li>
-        <li>ট্যাব/অ্যাপ বদলালে <b>কাউন্ট হয়</b> এবং স্যার দেখতে পাবেন</li>
-        <li>এক রোল দিয়ে <b>একবারই</b> দেওয়া যাবে — ভেবে শুরু করো</li>
-        <li>পরের প্রশ্নে গেলে আর <b>ফিরে আসা যাবে না</b></li>
-      </ul>
+      <ul class="rules" id="ruleList"></ul>
       <button class="btn" id="btnStart">কুইজ শুরু করো</button>
       <div class="err" id="joinErr"></div>
     </div>
@@ -166,6 +169,7 @@ tr.me td{background:var(--accent-soft);font-weight:700}
   <!-- LEADERBOARD -->
   <div id="vBoard" class="card" hidden>
     <h2>লিডারবোর্ড</h2>
+    <div class="chips" id="bChips"></div>
     <div id="bBody"><p class="note">লোড হচ্ছে...</p></div>
     <button class="btn ghost" id="btnRefresh">রিফ্রেশ</button>
     <button class="btn ghost" id="btnBack" style="margin-top:10px">ফিরে যাও</button>
@@ -177,8 +181,14 @@ tr.me td{background:var(--accent-soft);font-weight:700}
 <script>
 /* ================= CONFIG ================= */
 const API_URL = "https://script.google.com/macros/s/AKfycby0FIeoKk9pnjEMz22IQ8jy8xfIuArNVvYO3sPmGYh1-mkHX_31LoWA4QdyNhqDfCGEBQ/exec";
-const PER_Q_SECONDS = 45;
-const NUM_QUESTIONS = 25;
+/* Sheet er "Config" tab theke live config ashe: exam_name, semesters,
+   per_q_seconds, num_questions, sets, results_sheet, exam_start, exam_end */
+const DEFAULTS = { exam_name:"CST Python Quiz", semesters:"1st Semester",
+  per_q_seconds:45, num_questions:25, sets:"", default_set:"auto", open:true,
+  exam_start:"", exam_end:"", combined_rank:true, points_correct:1, penalty_wrong:0, penalty_tabswitch:0 };
+let CONFIG = DEFAULTS;
+let SHEET_QUESTIONS = {};   /* Questions sheet theke, set-name keyed */
+let RULES = [];             /* Rules sheet theke niyom list */
 
 /* ============ Seeded RNG (roll-based: same roll = same paper) ============ */
 function hashSeed(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}return h>>>0}
@@ -284,6 +294,13 @@ function(r){const p=rint(r,5,9),q2=rint(r,1,4),s=rint(r,5,9),t=rint(r,1,9);
 ];
 /* ============ GEN-END ============ */
 
+/* ============ QUESTION SETS ============
+   প্রত্যেক সেমিস্টার আলাদা প্রশ্ন-সেট পেতে পারে। Sheet-এর Config-এ "sets" এ লেখো:
+   1st Semester=basic;3rd Semester=basic
+   নতুন সেট বানাতে: SETS-এ নতুন নাম দিয়ে generator list দাও।
+=========================================== */
+const SETS = { "basic": GENERATORS };
+
 /* ============ QUESTION BANK — নিজের প্রশ্ন যোগ/এডিট করো ============
    নিচের MY_QUESTIONS লিস্টে নিজের প্রশ্ন বসাও। ফরম্যাট (কমা দিয়ে যতগুলো খুশি):
 
@@ -291,7 +308,8 @@ function(r){const p=rint(r,5,9),q2=rint(r,1,4),s=rint(r,5,9),t=rint(r,1,9);
      q: "আউটপুট কী হবে?",                      // প্রশ্ন
      code: "x = 5\nprint(x * 2)",              // কোড — নতুন লাইন মানে \n
      options: ["10", "52", "Error", "x * 2"],  // ঠিক ৪টা অপশন
-     answer: 0                                  // সঠিক অপশনের অবস্থান (0,1,2,3)
+     answer: 0,                                 // সঠিক অপশনের অবস্থান (0,1,2,3)
+     set: "basic"                               // (optional) কোন সেটে যাবে; না দিলে সব সেটে
    },
 
    - কোনো অটো-জেনারেটেড প্রশ্ন বাদ দিতে চাইলে উপরের GENERATORS লিস্ট
@@ -302,14 +320,29 @@ function(r){const p=rint(r,5,9),q2=rint(r,1,4),s=rint(r,5,9),t=rint(r,1,9);
 const MY_QUESTIONS=[
 ];
 
-function buildPaper(roll){
-  const r=mulberry32(hashSeed("cst52-"+roll));
-  const gen=GENERATORS.map(g=>g(r));
-  const mine=MY_QUESTIONS.map(s=>{
-    const order=shuffle(r,[0,1,2,3]);
-    return {q:s.q,code:s.code,opts:order.map(i=>String(s.options[i])),correct:order.indexOf(s.answer)};
-  });
-  return shuffle(r,gen.concat(mine)).slice(0,NUM_QUESTIONS);
+function mkStatic(r,s){
+  const n=s.options.length;
+  const order=shuffle(r,[...Array(n).keys()]);
+  return {q:s.q,code:s.code,opts:order.map(i=>String(s.options[i])),correct:order.indexOf(s.answer)};
+}
+function buildPaper(roll, sem){
+  const setMap={};
+  String(CONFIG.sets||"").split(";").forEach(p=>{const[k,v]=p.split("=");if(k&&v)setMap[k.trim()]=v.trim()});
+  const setName=setMap[sem]||CONFIG.default_set||"auto";
+  const r=mulberry32(hashSeed("cst52-"+roll+"-"+sem));
+  let pool;
+  if(setName==="auto"){
+    /* generated Python questions (prottek student alada) */
+    pool=GENERATORS.map(g=>g(r)).concat(
+      MY_QUESTIONS.filter(s=>!s.set||s.set==="auto").map(s=>mkStatic(r,s)));
+  }else{
+    /* Questions sheet er oi Set (static; option order student-bhede shuffle) */
+    const sheetQs=(SHEET_QUESTIONS[setName]||[]).map(s=>mkStatic(r,s));
+    const extra=MY_QUESTIONS.filter(s=>s.set===setName).map(s=>mkStatic(r,s));
+    pool=sheetQs.concat(extra);
+  }
+  if(!pool.length) pool=GENERATORS.map(g=>g(r));  /* fallback */
+  return shuffle(r,pool).slice(0,CONFIG.num_questions);
 }
 
 /* ============ Canvas code renderer (copy-proof) ============ */
@@ -350,9 +383,61 @@ const views={join:$("vJoin"),quiz:$("vQuiz"),done:$("vDone"),board:$("vBoard")};
 function show(v){for(const k in views)views[k].hidden=(k!==v)}
 let student=null, paper=[], qi=0, score=0, timeouts=0, timeMs=0, tabSwitches=0;
 let qStart=0, tickId=null, answers=[], locked=false, submitted=false;
+let boardRows=[], boardFilter="__all__";
 
 document.addEventListener("visibilitychange",()=>{ if(document.hidden && !views.quiz.hidden) tabSwitches++; });
 ["copy","cut","contextmenu"].forEach(ev=>document.addEventListener(ev,e=>{ if(!views.quiz.hidden) e.preventDefault(); }));
+
+/* ---- config load: Sheet theke exam setup ashe ---- */
+function fmtDT(iso){
+  try{ return new Date(iso).toLocaleString("bn-BD",{dateStyle:"medium",timeStyle:"short"}); }
+  catch(e){ return iso; }
+}
+function fillTpl(t){ return String(t).replace(/\{(\w+)\}/g,(m,k)=>CONFIG[k]!==undefined?esc(String(CONFIG[k])):m); }
+async function loadConfig(){
+  try{
+    const j=await fetch(API_URL).then(r=>r.json());
+    if(j.ok&&j.config){ CONFIG=j.config; boardRows=j.rows||[]; SHEET_QUESTIONS=j.questions||{}; RULES=j.rules||[]; }
+  }catch(e){ /* config na pele defaults */ }
+  $("examName").textContent=CONFIG.exam_name;
+  if(CONFIG.institute) $("brandSub").textContent=CONFIG.institute;
+  document.title=CONFIG.exam_name;
+  $("joinLoading").hidden=true;
+  if(!CONFIG.open){
+    const now=new Date(), st=CONFIG.exam_start?new Date(CONFIG.exam_start):null;
+    if(String(CONFIG.active).toLowerCase()==="no"){
+      $("lockTitle").textContent="কুইজ এখন বন্ধ";
+      $("lockMsg").textContent=CONFIG.off_message||"এই মুহূর্তে কুইজটি বন্ধ আছে।";
+    }else if(st&&now<st){
+      $("lockTitle").textContent="এক্সাম এখনো শুরু হয়নি";
+      $("lockMsg").textContent="শুরু হবে: "+fmtDT(CONFIG.exam_start)+(CONFIG.exam_end?" · শেষ: "+fmtDT(CONFIG.exam_end):"");
+    }else{
+      $("lockTitle").textContent="এক্সাম শেষ হয়ে গেছে";
+      $("lockMsg").textContent=CONFIG.exam_end?("শেষ হয়েছে: "+fmtDT(CONFIG.exam_end)):"";
+    }
+    $("joinLocked").hidden=false;
+    return;
+  }
+  const semSel=$("fSem"); semSel.innerHTML="";
+  String(CONFIG.semesters).split(",").map(s=>s.trim()).filter(Boolean).forEach(s=>{
+    const o=document.createElement("option"); o.textContent=s; semSel.appendChild(o);
+  });
+  if(RULES.length){
+    $("ruleList").innerHTML=RULES.map(t=>`<li>${fillTpl(t)}</li>`).join("");
+  }else{
+    $("ruleList").innerHTML=
+      `<li><b>${CONFIG.num_questions}টা প্রশ্ন</b>, প্রতিটায় <b>${CONFIG.per_q_seconds} সেকেন্ড</b></li>`+
+      `<li>মার্ক সমান হলে <b>কম সময়</b> যার, র‍্যাংকিংয়ে সে এগিয়ে</li>`+
+      `<li>প্রত্যেক স্টুডেন্টের প্রশ্ন <b>আলাদা</b> — কপি করে লাভ নেই</li>`+
+      `<li>ট্যাব/অ্যাপ বদলালে <b>কাউন্ট হয়</b> এবং স্যার দেখতে পাবেন</li>`+
+      `<li>এক রোল দিয়ে <b>একবারই</b> দেওয়া যাবে — ভেবে শুরু করো</li>`+
+      `<li>পরের প্রশ্নে গেলে আর <b>ফিরে আসা যাবে না</b></li>`+
+      ((CONFIG.penalty_wrong>0||CONFIG.penalty_tabswitch>0)?`<li>ভুলে <b>−${CONFIG.penalty_wrong}</b>, ট্যাব-সুইচে <b>−${CONFIG.penalty_tabswitch}</b> মার্ক</li>`:"")+
+      `<li>লিডারবোর্ড দেখতে হলে আগে <b>এক্সাম দিতে হবে</b></li>`;
+  }
+  $("joinForm").hidden=false;
+}
+loadConfig();
 
 /* join */
 $("btnStart").onclick=()=>{
@@ -362,10 +447,11 @@ $("btnStart").onclick=()=>{
   if(name.length<3){err.textContent="নামটা ঠিকমতো লেখো।";return}
   if(!/^\d{3,10}$/.test(roll)){err.textContent="রোল নম্বর ঠিকমতো লেখো (শুধু সংখ্যা)।";return}
   roll=String(parseInt(roll,10));
-  try{ if(localStorage.getItem("cstq-done-"+roll)){err.textContent="এই রোল দিয়ে এই ডিভাইস থেকে একবার দেওয়া হয়ে গেছে।";return} }catch(e){}
+  const sem=$("fSem").value;
+  try{ if(localStorage.getItem("cstq-done-"+roll+"-"+sem)){err.textContent="এই রোল দিয়ে এই ডিভাইস থেকে একবার দেওয়া হয়ে গেছে।";return} }catch(e){}
   err.textContent="";
-  student={name,roll,shift:$("fShift").value};
-  paper=buildPaper(roll);
+  student={name,roll,sem,shift:$("fShift").value};
+  paper=buildPaper(roll,sem);
   qi=0;score=0;timeouts=0;timeMs=0;tabSwitches=0;answers=[];submitted=false;
   show("quiz"); renderQ();
 };
@@ -389,17 +475,17 @@ function renderQ(){
   tickId=setInterval(tick,150); tick();
 }
 function tick(){
-  const used=(Date.now()-qStart)/1000, left=Math.max(0,PER_Q_SECONDS-used);
+  const used=(Date.now()-qStart)/1000, left=Math.max(0,CONFIG.per_q_seconds-used);
   const el=$("qTime"),bar=$("qBar");
   el.textContent=Math.ceil(left)+"s";
-  bar.style.width=(left/PER_Q_SECONDS*100)+"%";
+  bar.style.width=(left/CONFIG.per_q_seconds*100)+"%";
   el.classList.toggle("low",left<=10); bar.classList.toggle("low",left<=10);
   if(left<=0) answer(-1);
 }
 function answer(i){
   if(locked)return; locked=true;
   clearInterval(tickId);
-  const used=Math.min(Date.now()-qStart,PER_Q_SECONDS*1000);
+  const used=Math.min(Date.now()-qStart,CONFIG.per_q_seconds*1000);
   timeMs+=used;
   const q=paper[qi];
   if(i===-1){timeouts++;answers.push("T")}
@@ -416,23 +502,20 @@ function finish(){
   $("dMiss").textContent=timeouts;
   const s=Math.round(timeMs/1000);
   $("dTime").textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
-  try{localStorage.setItem("cstq-done-"+student.roll,"1")}catch(e){}
-  if(!API_URL){
-    $("dSubmitZone").hidden=true;
-    $("dOk").hidden=false;
-    $("dOk").querySelector(".pill").textContent="⚠ এই স্ক্রিনের স্ক্রিনশট স্যারকে পাঠাও";
-  }
+  try{localStorage.setItem("cstq-done-"+student.roll+"-"+student.sem,"1")}catch(e){}
 }
 $("btnSubmit").onclick=async()=>{
   const btn=$("btnSubmit"); btn.disabled=true; btn.textContent="পাঠাচ্ছি...";
   try{
     const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({
-      name:student.name,roll:student.roll,section:student.shift,
-      score,total:paper.length,timeMs,tabSwitches,answers:answers.join("")
+      name:student.name,roll:student.roll,semester:student.sem,shift:student.shift,
+      correct:score, wrong:answers.filter(a=>a==="W").length, timeout:timeouts,
+      total:paper.length,timeMs,tabSwitches,answers:answers.join("")
     })});
     const j=await res.json();
     if(j.ok){submitted=true;$("dSubmitZone").hidden=true;$("dOk").hidden=false}
     else if(j.error==="duplicate"){$("dErr").textContent="এই রোলের রেজাল্ট আগেই জমা হয়েছে।"}
+    else if(j.error==="closed"){$("dErr").textContent="এক্সামের সময় শেষ — রেজাল্ট আর জমা নেওয়া হচ্ছে না।"}
     else throw 0;
   }catch(e){
     $("dErr").textContent="জমা হয়নি — ইন্টারনেট চেক করে আবার চেষ্টা করো।";
@@ -440,29 +523,44 @@ $("btnSubmit").onclick=async()=>{
   }
 };
 
-/* leaderboard */
-let backTo="join";
-$("tabBoard").onclick=()=>{backTo="join";openBoard()};
-$("btnSeeBoard").onclick=()=>{backTo="done";openBoard()};
-$("btnBack").onclick=()=>show(backTo);
+/* leaderboard — submit korar por i dekha jay */
+$("btnSeeBoard").onclick=()=>{ if(submitted) openBoard(); };
+$("btnBack").onclick=()=>show("done");
 $("btnRefresh").onclick=openBoard;
+function renderBoard(){
+  const el=$("bBody");
+  const sems=[...new Set(boardRows.map(x=>x.semester).filter(Boolean))];
+  const allowCombined = CONFIG.combined_rank!==false;
+  if(!allowCombined && boardFilter==="__all__") boardFilter = sems[0]||"__all__";
+  const chips=$("bChips"); chips.innerHTML="";
+  const mk=(label,val)=>{
+    const b=document.createElement("button");
+    b.textContent=label; if(boardFilter===val)b.className="on";
+    b.onclick=()=>{boardFilter=val;renderBoard()};
+    chips.appendChild(b);
+  };
+  if(allowCombined) mk("সম্মিলিত","__all__");
+  sems.forEach(x=>mk(x,x));
+  const rows=boardRows
+    .filter(x=>boardFilter==="__all__"||x.semester===boardFilter)
+    .sort((a,b)=>b.score-a.score||a.timeSec-b.timeSec);
+  let html='<table><tr><th>#</th><th>নাম</th><th>রোল</th><th>সেমিস্টার</th><th>স্কোর</th><th>সময়</th></tr>';
+  rows.forEach((x,i)=>{
+    const me=student&&String(x.roll)===String(student.roll)&&x.semester===student.sem?' class="me"':'';
+    const mm=Math.floor(x.timeSec/60),ss=String(x.timeSec%60).padStart(2,"0");
+    html+=`<tr${me}><td>${i+1}</td><td>${esc(x.name)}</td><td>${esc(x.roll)}</td><td>${esc(x.semester)}</td><td>${x.score}</td><td>${mm}:${ss}</td></tr>`;
+  });
+  el.innerHTML=html+"</table>"+(rows.length?"":'<p class="note">এখনো কেউ সাবমিট করেনি।</p>');
+}
 async function openBoard(){
   show("board");
-  const el=$("bBody");
-  if(!API_URL){el.innerHTML='<p class="note">লিডারবোর্ড এখনো চালু হয়নি।</p>';return}
-  el.innerHTML='<p class="note">লোড হচ্ছে...</p>';
+  $("bBody").innerHTML='<p class="note">লোড হচ্ছে...</p>';
   try{
-    const res=await fetch(API_URL); const j=await res.json();
+    const j=await fetch(API_URL).then(r=>r.json());
     if(!j.ok)throw 0;
-    const rows=j.rows.sort((a,b)=>b.score-a.score||a.timeSec-b.timeSec);
-    let html='<table><tr><th>#</th><th>নাম</th><th>রোল</th><th>মার্ক</th><th>সময়</th></tr>';
-    rows.forEach((x,i)=>{
-      const me=student&&String(x.roll)===String(student.roll)?' class="me"':'';
-      const mm=Math.floor(x.timeSec/60),ss=String(x.timeSec%60).padStart(2,"0");
-      html+=`<tr${me}><td>${i+1}</td><td>${esc(x.name)}</td><td>${esc(x.roll)}</td><td>${x.score}/${x.total}</td><td>${mm}:${ss}</td></tr>`;
-    });
-    el.innerHTML=html+"</table>"+(rows.length?"":'<p class="note">এখনো কেউ সাবমিট করেনি।</p>');
-  }catch(e){el.innerHTML='<p class="note">লিডারবোর্ড লোড হচ্ছে না — একটু পরে আবার চেষ্টা করো।</p>'}
+    boardRows=j.rows||[];
+    renderBoard();
+  }catch(e){$("bBody").innerHTML='<p class="note">লিডারবোর্ড লোড হচ্ছে না — একটু পরে আবার চেষ্টা করো।</p>'}
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
