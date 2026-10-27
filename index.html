@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CST Python Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: single centered column app, one view at a time; code on canvas; emerald accent on cool slate */
+:root{
+  --bg:#f4f6f5; --card:#ffffff; --fg:#1a2b26; --muted:#5c6f69; --line:#dde5e2;
+  --accent:#0e8a6d; --accent-fg:#ffffff; --accent-soft:#e3f2ed;
+  --danger:#c0392b; --warn:#b9770e; --code-bg:#13201c;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1715; --card:#18231f; --fg:#e4ece9; --muted:#93a59f; --line:#2a3833;
+    --accent:#2fbf96; --accent-fg:#06211a; --accent-soft:#1b322b;
+    --danger:#e07b6c; --warn:#d8a350; --code-bg:#0b1310;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1715; --card:#18231f; --fg:#e4ece9; --muted:#93a59f; --line:#2a3833;
+  --accent:#2fbf96; --accent-fg:#06211a; --accent-soft:#1b322b;
+  --danger:#e07b6c; --warn:#d8a350; --code-bg:#0b1310;
+  color-scheme: dark;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:'Hind Siliguri',system-ui,sans-serif;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px);
+  -webkit-font-smoothing:antialiased;
+}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding-block:20px 40px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+.brand h1{font-size:20px;font-weight:700}
+.brand span{font-size:13px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+h2{font-size:18px;margin-bottom:12px}
+label{display:block;font-size:14px;font-weight:600;margin:14px 0 5px}
+input,select{
+  width:100%;padding:11px 12px;font-size:16px;font-family:inherit;
+  border:1.5px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);
+}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.btn{
+  display:inline-block;width:100%;padding:13px;margin-top:18px;font-size:16px;font-weight:700;
+  font-family:inherit;border:none;border-radius:10px;cursor:pointer;
+  background:var(--accent);color:var(--accent-fg);
+}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.rules{margin-top:16px;font-size:14px;line-height:1.65;color:var(--muted)}
+.rules li{margin-left:20px;margin-bottom:6px}
+.rules b{color:var(--fg)}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{
+  flex:1;padding:9px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+  border:1.5px solid var(--line);border-radius:9px;background:var(--card);color:var(--muted);
+}
+.tabs button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.err{color:var(--danger);font-size:14px;margin-top:10px;min-height:20px}
+
+/* quiz */
+.qtop{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;margin-bottom:8px}
+.qtop .tleft{font-variant-numeric:tabular-nums}
+.tleft.low{color:var(--danger)}
+.tbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-bottom:16px}
+.tbar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .2s linear}
+.tbar i.low{background:var(--danger)}
+.qtext{font-size:16px;font-weight:600;margin-bottom:12px}
+.codebox{border-radius:10px;overflow:hidden;margin-bottom:16px;background:var(--code-bg)}
+canvas{display:block;width:100%;height:auto}
+.opts{display:grid;gap:10px}
+.opt{
+  padding:13px 14px;font-size:16px;text-align:left;font-family:'JetBrains Mono',monospace;
+  border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);cursor:pointer;
+}
+.opt:active{background:var(--accent-soft);border-color:var(--accent)}
+.noselect,.noselect *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* done + board */
+.big{font-size:40px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat{display:flex;gap:10px;margin:16px 0}
+.stat div{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{color:var(--muted);font-size:12.5px;text-align:left;padding:8px 6px;border-bottom:1.5px solid var(--line)}
+td{padding:9px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tr.me td{background:var(--accent-soft);font-weight:700}
+.note{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.6}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600;background:var(--accent-soft);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><h1>CST Python Quiz</h1><span>Pabna Polytechnic Institute · 1st Semester</span></div>
+
+  <!-- JOIN -->
+  <div id="vJoin" class="card">
+    <div class="tabs">
+      <button id="tabQuiz" class="on">কুইজ</button>
+      <button id="tabBoard">লিডারবোর্ড</button>
+    </div>
+    <div id="joinForm">
+      <h2>Python Programming Quiz</h2>
+      <label for="fName">নাম (Full Name)</label>
+      <input id="fName" maxlength="40" autocomplete="off" placeholder="Md Abu Talha">
+      <label for="fRoll">বোর্ড রোল</label>
+      <input id="fRoll" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="123456">
+      <label for="fShift">শিফট</label>
+      <select id="fShift"><option>1st Shift</option><option>2nd Shift</option></select>
+      <ul class="rules">
+        <li><b>২৫টা প্রশ্ন</b>, প্রতিটায় <b>৪৫ সেকেন্ড</b> — সব মিলিয়ে ~১৫ মিনিট</li>
+        <li>মার্ক সমান হলে <b>কম সময়</b> যার, র‍্যাংকিংয়ে সে এগিয়ে</li>
+        <li>প্রত্যেক স্টুডেন্টের প্রশ্ন <b>আলাদা</b> — কপি করে লাভ নেই</li>
+        <li>ট্যাব/অ্যাপ বদলালে <b>কাউন্ট হয়</b> এবং স্যার দেখতে পাবেন</li>
+        <li>এক রোল দিয়ে <b>একবারই</b> দেওয়া যাবে — ভেবে শুরু করো</li>
+        <li>পরের প্রশ্নে গেলে আর <b>ফিরে আসা যাবে না</b></li>
+      </ul>
+      <button class="btn" id="btnStart">কুইজ শুরু করো</button>
+      <div class="err" id="joinErr"></div>
+    </div>
+  </div>
+
+  <!-- QUIZ -->
+  <div id="vQuiz" class="card noselect" hidden>
+    <div class="qtop">
+      <span id="qNum">প্রশ্ন 1/25</span>
+      <span class="tleft" id="qTime">45s</span>
+    </div>
+    <div class="tbar"><i id="qBar" style="width:100%"></i></div>
+    <div class="qtext" id="qText"></div>
+    <div class="codebox"><canvas id="qCode"></canvas></div>
+    <div class="opts" id="qOpts"></div>
+  </div>
+
+  <!-- DONE -->
+  <div id="vDone" class="card" hidden>
+    <h2>কুইজ শেষ!</h2>
+    <div class="big" id="dScore">0/25</div>
+    <div class="stat">
+      <div><b id="dTime">0:00</b><span>মোট সময়</span></div>
+      <div><b id="dRight">0</b><span>সঠিক</span></div>
+      <div><b id="dMiss">0</b><span>টাইমআউট</span></div>
+    </div>
+    <div id="dSubmitZone">
+      <button class="btn" id="btnSubmit">রেজাল্ট জমা দাও</button>
+      <div class="err" id="dErr"></div>
+    </div>
+    <div id="dOk" hidden>
+      <p class="pill">✓ রেজাল্ট জমা হয়েছে</p>
+      <button class="btn ghost" id="btnSeeBoard">লিডারবোর্ড দেখো</button>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="vBoard" class="card" hidden>
+    <h2>লিডারবোর্ড</h2>
+    <div id="bBody"><p class="note">লোড হচ্ছে...</p></div>
+    <button class="btn ghost" id="btnRefresh">রিফ্রেশ</button>
+    <button class="btn ghost" id="btnBack" style="margin-top:10px">ফিরে যাও</button>
+  </div>
+
+  <p class="note" style="text-align:center">Dept. of Computer Science &amp; Technology</p>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const API_URL = "https://script.google.com/macros/s/AKfycby0FIeoKk9pnjEMz22IQ8jy8xfIuArNVvYO3sPmGYh1-mkHX_31LoWA4QdyNhqDfCGEBQ/exec";
+const PER_Q_SECONDS = 45;
+const NUM_QUESTIONS = 25;
+
+/* ============ Seeded RNG (roll-based: same roll = same paper) ============ */
+function hashSeed(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}return h>>>0}
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}}
+const rint=(r,a,b)=>a+Math.floor(r()*(b-a+1));
+const pick=(r,arr)=>arr[Math.floor(r()*arr.length)];
+function shuffle(r,arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* Build 4 unique options around the correct value */
+function mkOpts(r,correct,distractors){
+  const seen=new Set([String(correct)]), opts=[String(correct)];
+  for(const d of distractors){ if(opts.length>=4)break; const s=String(d); if(!seen.has(s)){seen.add(s);opts.push(s)} }
+  let n=1;
+  while(opts.length<4){ /* numeric fallback spares */
+    const base=parseFloat(correct);
+    const s=isNaN(base)?("Option "+n):String(base+n);
+    if(!seen.has(s)){seen.add(s);opts.push(s)}
+    n++;
+  }
+  const order=shuffle(r,[0,1,2,3]);
+  return {opts:order.map(i=>opts[i]), correct:order.indexOf(0)};
+}
+
+/* ============ GEN-START: 25 question templates ============ */
+const GENERATORS=[
+function(r){const a=rint(r,2,5),b=rint(r,2,5),c=rint(r,2,6);
+  return {q:"আউটপুট কী হবে?",code:`print(${a} + ${b} * ${c})`,
+  ...mkOpts(r,a+b*c,[(a+b)*c,a*b+c,a+b+c])};},
+function(r){const x=rint(r,2,9),y=rint(r,2,9);
+  return {q:"আউটপুট কী হবে?",code:`print("${x}" + "${y}")`,
+  ...mkOpts(r,`${x}${y}`,[x+y,"Error",`${x} ${y}`])};},
+function(r){const x=rint(r,2,9),y=rint(r,2,9);
+  return {q:"আউটপুট কী হবে?",code:`print("${x}" + ${y})`,
+  ...mkOpts(r,"Error",[`${x}${y}`,x+y,`${x} ${y}`])};},
+function(r){const b=rint(r,2,5);let a=rint(r,7,29);if(a%b===0)a++;
+  return {q:"আউটপুট কী হবে?",code:`print(${a} // ${b})`,
+  ...mkOpts(r,Math.floor(a/b),[Math.round((a/b)*10)/10,a%b,Math.floor(a/b)+1])};},
+function(r){const b=rint(r,3,6);let a=rint(r,8,27);if(a%b===0)a++;
+  return {q:"আউটপুট কী হবে?",code:`print(${a} % ${b})`,
+  ...mkOpts(r,a%b,[Math.floor(a/b),a-b,b])};},
+function(r){const a=rint(r,3,9);
+  return {q:"আউটপুট কী হবে?",code:`print(${a} ** 2)`,
+  ...mkOpts(r,a*a,[a*2,a+2,a*a+a])};},
+function(r){const b=rint(r,2,5),q=rint(r,2,9),a=b*q;
+  return {q:"আউটপুট কী হবে?",code:`print(${a} / ${b})`,
+  ...mkOpts(r,`${q}.0`,[`${q}`,`${q}.5`,"Error"])};},
+function(r){const t=pick(r,[["5.0","<class 'float'>",["<class 'int'>","<class 'str'>","float"]],["\"Hello\"","<class 'str'>",["<class 'int'>","<class 'list'>","string"]],["10","<class 'int'>",["<class 'float'>","<class 'str'>","int"]],["True","<class 'bool'>",["<class 'int'>","<class 'str'>","bool"]]]);
+  return {q:"আউটপুট কী হবে?",code:`print(type(${t[0]}))`,
+  ...mkOpts(r,t[1],t[2])};},
+function(r){const x=rint(r,3,9),y=rint(r,2,9);
+  return {q:"আউটপুট কী হবে?",code:`print(int("${x}") + ${y})`,
+  ...mkOpts(r,x+y,[`${x}${y}`,"Error",x])};},
+function(r){const a=rint(r,3,9),b=rint(r,2,9);
+  return {q:"আউটপুট কী হবে?",code:`x = ${a}\nx = x + ${b}\nprint(x)`,
+  ...mkOpts(r,a+b,[a,b,a*b])};},
+function(r){const m=rint(r,2,9);let n=rint(r,2,9);if(n===m)n=(n%9)+1;
+  return {q:"আউটপুট কী হবে?",code:`a = ${m}\nb = a\na = ${n}\nprint(b)`,
+  ...mkOpts(r,m,[n,m+n,"Error"])};},
+function(r){const a=rint(r,2,20);let b=rint(r,2,20);if(b===a)b++;
+  return {q:"আউটপুট কী হবে?",code:`x = ${a}\ny = ${b}\nif x > y:\n    print("Boro")\nelse:\n    print("Choto")`,
+  ...mkOpts(r,a>b?"Boro":"Choto",[a>b?"Choto":"Boro","Error","কিছুই প্রিন্ট হবে না"])};},
+function(r){const m=pick(r,[35,45,55,65,75,85,95]);
+  const g=m>=80?"A+":m>=60?"A":m>=40?"B":"F";
+  return {q:"আউটপুট কী হবে?",code:`marks = ${m}\nif marks >= 80:\n    print("A+")\nelif marks >= 60:\n    print("A")\nelif marks >= 40:\n    print("B")\nelse:\n    print("F")`,
+  ...mkOpts(r,g,["A+","A","B","F"].filter(x=>x!==g))};},
+function(r){const n=rint(r,3,7);
+  return {q:'"Hi" কতবার প্রিন্ট হবে?',code:`for i in range(${n}):\n    print("Hi")`,
+  ...mkOpts(r,n,[n-1,n+1,"অসীমবার (Infinite)"])};},
+function(r){const a=rint(r,1,3),b=a+rint(r,4,7);
+  return {q:"সবশেষে কোন নাম্বারটা প্রিন্ট হবে?",code:`for i in range(${a}, ${b}):\n    print(i)`,
+  ...mkOpts(r,b-1,[b,a,b+1])};},
+function(r){const n=rint(r,3,5),s=n*(n+1)/2;
+  return {q:"আউটপুট কী হবে?",code:`total = 0\nfor i in range(1, ${n+1}):\n    total = total + i\nprint(total)`,
+  ...mkOpts(r,s,[n,s+n,n*n])};},
+function(r){const n=rint(r,3,6);
+  return {q:"আউটপুট কী হবে?",code:`count = 0\nwhile count < ${n}:\n    count = count + 1\nprint(count)`,
+  ...mkOpts(r,n,[n-1,n+1,"Infinite loop (শেষ হবে না)"])};},
+function(r){const k=rint(r,3,6);
+  return {q:"সবশেষে কোন নাম্বারটা প্রিন্ট হবে?",code:`for i in range(1, 10):\n    if i == ${k}:\n        break\n    print(i)`,
+  ...mkOpts(r,k-1,[k,9,1])};},
+function(r){const w=pick(r,[["python",6],["computer",8],["pabna",5],["diploma",7],["program",7],["keyboard",8]]);
+  return {q:"আউটপুট কী হবে?",code:`print(len("${w[0]}"))`,
+  ...mkOpts(r,w[1],[w[1]-1,w[1]+1,w[1]+2])};},
+function(r){const w=pick(r,["Go","Hi","La"]),n=rint(r,2,4);
+  return {q:"আউটপুট কী হবে?",code:`print("${w}" * ${n})`,
+  ...mkOpts(r,w.repeat(n),[w+n,w.repeat(n-1),"Error"])};},
+function(r){const base=rint(r,2,6),nums=[0,1,2,3,4].map(i=>base*10+i*rint(r,2,9)+i),i=rint(r,1,3);
+  return {q:"আউটপুট কী হবে?",code:`nums = [${nums.join(", ")}]\nprint(nums[${i}])`,
+  ...mkOpts(r,nums[i],[nums[i-1],nums[i+1],i])};},
+function(r){const nums=[rint(r,10,30),rint(r,31,50),rint(r,51,70),rint(r,71,99)];
+  return {q:"আউটপুট কী হবে?",code:`nums = [${nums.join(", ")}]\nprint(nums[-1])`,
+  ...mkOpts(r,nums[3],[nums[0],"Error",nums[1]])};},
+function(r){const f=shuffle(r,["Apple","Banana","Orange","Guava","Lichu"]).slice(0,3);
+  return {q:"আউটপুট কী হবে?",code:`fruits = ["${f[0]}", "${f[1]}", "${f[2]}"]\nfruits.append("Mango")\nprint(len(fruits))`,
+  ...mkOpts(r,4,[3,5,"Error"])};},
+function(r){const a=rint(r,4,9);
+  return {q:"আউটপুট কী হবে?",code:`print(${a} == ${a}.0)`,
+  ...mkOpts(r,"True",["False","Error",a])};},
+function(r){const p=rint(r,5,9),q2=rint(r,1,4),s=rint(r,5,9),t=rint(r,1,9);
+  const ans=(p>q2)&&(s>t);
+  return {q:"আউটপুট কী হবে?",code:`print(${p} > ${q2} and ${s} > ${t})`,
+  ...mkOpts(r,ans?"True":"False",[ans?"False":"True","Error","None"])};},
+];
+/* ============ GEN-END ============ */
+
+/* ============ QUESTION BANK — নিজের প্রশ্ন যোগ/এডিট করো ============
+   নিচের MY_QUESTIONS লিস্টে নিজের প্রশ্ন বসাও। ফরম্যাট (কমা দিয়ে যতগুলো খুশি):
+
+   {
+     q: "আউটপুট কী হবে?",                      // প্রশ্ন
+     code: "x = 5\nprint(x * 2)",              // কোড — নতুন লাইন মানে \n
+     options: ["10", "52", "Error", "x * 2"],  // ঠিক ৪টা অপশন
+     answer: 0                                  // সঠিক অপশনের অবস্থান (0,1,2,3)
+   },
+
+   - কোনো অটো-জেনারেটেড প্রশ্ন বাদ দিতে চাইলে উপরের GENERATORS লিস্ট
+     থেকে ওই function(r){...} ব্লকটা (কমা সহ) মুছে দাও
+   - কুইজে মোট কয়টা প্রশ্ন আসবে সেটা উপরের NUM_QUESTIONS এ ঠিক করো
+   - অপশনের অর্ডার স্টুডেন্টভেদে এমনিতেই এলোমেলো হবে, চিন্তা নেই
+================================================================== */
+const MY_QUESTIONS=[
+];
+
+function buildPaper(roll){
+  const r=mulberry32(hashSeed("cst52-"+roll));
+  const gen=GENERATORS.map(g=>g(r));
+  const mine=MY_QUESTIONS.map(s=>{
+    const order=shuffle(r,[0,1,2,3]);
+    return {q:s.q,code:s.code,opts:order.map(i=>String(s.options[i])),correct:order.indexOf(s.answer)};
+  });
+  return shuffle(r,gen.concat(mine)).slice(0,NUM_QUESTIONS);
+}
+
+/* ============ Canvas code renderer (copy-proof) ============ */
+const KW=new Set(["for","while","if","elif","else","in","break","and","or","not","True","False","def","return","import"]);
+const FN=new Set(["print","range","len","type","int","str","float","input","append"]);
+function drawCode(cv,code){
+  const lines=code.split("\n");
+  const dpr=window.devicePixelRatio||1;
+  const cssW=cv.parentElement.clientWidth;
+  const fs=Math.max(14,Math.min(17,cssW/26)), lh=fs*1.7, pad=16;
+  const cssH=pad*2+lines.length*lh;
+  cv.width=cssW*dpr; cv.height=cssH*dpr; cv.style.height=cssH+"px";
+  const x=cv.getContext("2d"); x.scale(dpr,dpr);
+  x.fillStyle="#0d1713"; x.fillRect(0,0,cssW,cssH);
+  x.font=`${fs}px 'JetBrains Mono',monospace`; x.textBaseline="middle";
+  const C={kw:"#7ce3b8",fn:"#6db8ff",str:"#f5c97b",num:"#f0938a",pl:"#dbe7e2",ln:"#4a5f57"};
+  lines.forEach((ln,i)=>{
+    const y=pad+i*lh+lh/2; let px=pad+34;
+    x.fillStyle=C.ln; x.fillText(String(i+1),pad,y);
+    /* tokenize: strings | words | other */
+    const parts=ln.split(/("(?:[^"]*)"|'(?:[^']*)')/g);
+    for(const part of parts){
+      if(part===undefined||part==="")continue;
+      if(/^["']/.test(part)){ x.fillStyle=C.str; x.fillText(part,px,y); px+=x.measureText(part).width; continue; }
+      const toks=part.split(/(\w+)/g);
+      for(const t of toks){
+        if(t===""||t===undefined)continue;
+        x.fillStyle=KW.has(t)?C.kw:FN.has(t)?C.fn:/^\d+$/.test(t)?C.num:C.pl;
+        x.fillText(t,px,y); px+=x.measureText(t).width;
+      }
+    }
+  });
+}
+
+/* ============ App state ============ */
+const $=id=>document.getElementById(id);
+const views={join:$("vJoin"),quiz:$("vQuiz"),done:$("vDone"),board:$("vBoard")};
+function show(v){for(const k in views)views[k].hidden=(k!==v)}
+let student=null, paper=[], qi=0, score=0, timeouts=0, timeMs=0, tabSwitches=0;
+let qStart=0, tickId=null, answers=[], locked=false, submitted=false;
+
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && !views.quiz.hidden) tabSwitches++; });
+["copy","cut","contextmenu"].forEach(ev=>document.addEventListener(ev,e=>{ if(!views.quiz.hidden) e.preventDefault(); }));
+
+/* join */
+$("btnStart").onclick=()=>{
+  const name=$("fName").value.trim();
+  let roll=$("fRoll").value.trim();
+  const err=$("joinErr");
+  if(name.length<3){err.textContent="নামটা ঠিকমতো লেখো।";return}
+  if(!/^\d{3,10}$/.test(roll)){err.textContent="রোল নম্বর ঠিকমতো লেখো (শুধু সংখ্যা)।";return}
+  roll=String(parseInt(roll,10));
+  try{ if(localStorage.getItem("cstq-done-"+roll)){err.textContent="এই রোল দিয়ে এই ডিভাইস থেকে একবার দেওয়া হয়ে গেছে।";return} }catch(e){}
+  err.textContent="";
+  student={name,roll,shift:$("fShift").value};
+  paper=buildPaper(roll);
+  qi=0;score=0;timeouts=0;timeMs=0;tabSwitches=0;answers=[];submitted=false;
+  show("quiz"); renderQ();
+};
+
+/* quiz */
+function renderQ(){
+  locked=false;
+  const q=paper[qi];
+  $("qNum").textContent=`প্রশ্ন ${qi+1}/${paper.length}`;
+  $("qText").textContent=q.q;
+  drawCode($("qCode"),q.code);
+  const box=$("qOpts"); box.innerHTML="";
+  q.opts.forEach((o,i)=>{
+    const b=document.createElement("button");
+    b.className="opt"; b.textContent=o;
+    b.onclick=()=>answer(i);
+    box.appendChild(b);
+  });
+  qStart=Date.now();
+  clearInterval(tickId);
+  tickId=setInterval(tick,150); tick();
+}
+function tick(){
+  const used=(Date.now()-qStart)/1000, left=Math.max(0,PER_Q_SECONDS-used);
+  const el=$("qTime"),bar=$("qBar");
+  el.textContent=Math.ceil(left)+"s";
+  bar.style.width=(left/PER_Q_SECONDS*100)+"%";
+  el.classList.toggle("low",left<=10); bar.classList.toggle("low",left<=10);
+  if(left<=0) answer(-1);
+}
+function answer(i){
+  if(locked)return; locked=true;
+  clearInterval(tickId);
+  const used=Math.min(Date.now()-qStart,PER_Q_SECONDS*1000);
+  timeMs+=used;
+  const q=paper[qi];
+  if(i===-1){timeouts++;answers.push("T")}
+  else if(i===q.correct){score++;answers.push("C")}
+  else answers.push("W");
+  qi++;
+  if(qi<paper.length) setTimeout(renderQ,220);
+  else finish();
+}
+function finish(){
+  show("done");
+  $("dScore").textContent=`${score}/${paper.length}`;
+  $("dRight").textContent=score;
+  $("dMiss").textContent=timeouts;
+  const s=Math.round(timeMs/1000);
+  $("dTime").textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+  try{localStorage.setItem("cstq-done-"+student.roll,"1")}catch(e){}
+  if(!API_URL){
+    $("dSubmitZone").hidden=true;
+    $("dOk").hidden=false;
+    $("dOk").querySelector(".pill").textContent="⚠ এই স্ক্রিনের স্ক্রিনশট স্যারকে পাঠাও";
+  }
+}
+$("btnSubmit").onclick=async()=>{
+  const btn=$("btnSubmit"); btn.disabled=true; btn.textContent="পাঠাচ্ছি...";
+  try{
+    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({
+      name:student.name,roll:student.roll,section:student.shift,
+      score,total:paper.length,timeMs,tabSwitches,answers:answers.join("")
+    })});
+    const j=await res.json();
+    if(j.ok){submitted=true;$("dSubmitZone").hidden=true;$("dOk").hidden=false}
+    else if(j.error==="duplicate"){$("dErr").textContent="এই রোলের রেজাল্ট আগেই জমা হয়েছে।"}
+    else throw 0;
+  }catch(e){
+    $("dErr").textContent="জমা হয়নি — ইন্টারনেট চেক করে আবার চেষ্টা করো।";
+    btn.disabled=false; btn.textContent="আবার চেষ্টা করো";
+  }
+};
+
+/* leaderboard */
+let backTo="join";
+$("tabBoard").onclick=()=>{backTo="join";openBoard()};
+$("btnSeeBoard").onclick=()=>{backTo="done";openBoard()};
+$("btnBack").onclick=()=>show(backTo);
+$("btnRefresh").onclick=openBoard;
+async function openBoard(){
+  show("board");
+  const el=$("bBody");
+  if(!API_URL){el.innerHTML='<p class="note">লিডারবোর্ড এখনো চালু হয়নি।</p>';return}
+  el.innerHTML='<p class="note">লোড হচ্ছে...</p>';
+  try{
+    const res=await fetch(API_URL); const j=await res.json();
+    if(!j.ok)throw 0;
+    const rows=j.rows.sort((a,b)=>b.score-a.score||a.timeSec-b.timeSec);
+    let html='<table><tr><th>#</th><th>নাম</th><th>রোল</th><th>মার্ক</th><th>সময়</th></tr>';
+    rows.forEach((x,i)=>{
+      const me=student&&String(x.roll)===String(student.roll)?' class="me"':'';
+      const mm=Math.floor(x.timeSec/60),ss=String(x.timeSec%60).padStart(2,"0");
+      html+=`<tr${me}><td>${i+1}</td><td>${esc(x.name)}</td><td>${esc(x.roll)}</td><td>${x.score}/${x.total}</td><td>${mm}:${ss}</td></tr>`;
+    });
+    el.innerHTML=html+"</table>"+(rows.length?"":'<p class="note">এখনো কেউ সাবমিট করেনি।</p>');
+  }catch(e){el.innerHTML='<p class="note">লিডারবোর্ড লোড হচ্ছে না — একটু পরে আবার চেষ্টা করো।</p>'}
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+document.fonts&&document.fonts.ready.then(()=>{ if(!views.quiz.hidden&&paper[qi])drawCode($("qCode"),paper[qi].code); });
+window.addEventListener("resize",()=>{ if(!views.quiz.hidden&&paper[qi])drawCode($("qCode"),paper[qi].code); });
+</script>
+</body>
+</html>
